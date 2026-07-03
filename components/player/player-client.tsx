@@ -169,6 +169,7 @@ export function PlayerClient({ slug }: { slug: string }) {
 
   return (
     <div
+      data-player
       className="flex h-screen w-screen cursor-none select-none flex-col overflow-hidden"
       style={{
         backgroundColor: branding.backgroundColor,

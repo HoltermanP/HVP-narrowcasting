@@ -129,6 +129,13 @@
   }
 }
 
+/* Voorkom dat lange woorden (URL's, projectnamen) buiten hun vak lopen op de
+   player. overflow-wrap: anywhere laat woorden afbreken én laat flex/grid-
+   kinderen krimpen, zodat tekst altijd binnen zijn kaart blijft. */
+[data-player] :where(h1, h2, h3, p, span, div, li) {
+  overflow-wrap: anywhere;
+}
+
 /* Rustige overgang tussen slides op de player */
 @keyframes player-slide-fade {
   from {

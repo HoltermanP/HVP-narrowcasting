@@ -51,6 +51,7 @@ export function Slide({
 }) {
   return (
     <div
+      data-player
       className="h-full w-full overflow-hidden"
       style={{
         containerType: "size",
@@ -105,7 +106,7 @@ function NewsSlide({
   return (
     <div className="flex h-full w-full" style={{ padding: "5cqw" }}>
       <div
-        className="flex min-w-0 flex-1 flex-col justify-center"
+        className="flex min-h-0 min-w-0 flex-1 flex-col justify-center overflow-hidden"
         style={{ gap: "2cqw", paddingRight: hasImage ? "4cqw" : 0 }}
       >
         <div
@@ -453,7 +454,7 @@ function PlanningSlide({
         {activities.map((activity, index) => (
           <div
             key={index}
-            className="flex items-center"
+            className="flex min-w-0 items-center overflow-hidden"
             style={{
               gap: "1.5cqw",
               ...cardStyle(branding),
@@ -949,7 +950,7 @@ function HighlightsSlide({
         {sections.map((section) => (
           <div
             key={section.key}
-            className="flex min-h-0 flex-col"
+            className="flex min-h-0 min-w-0 flex-col overflow-hidden"
             style={{
               ...cardStyle(branding),
               borderTop: `0.45cqw solid ${section.accent}`,
@@ -964,7 +965,10 @@ function HighlightsSlide({
             >
               {section.title}
             </p>
-            <div className="flex min-h-0 flex-col" style={{ gap: "1.2cqw" }}>
+            <div
+              className="flex min-h-0 flex-col overflow-hidden"
+              style={{ gap: "1.2cqw" }}
+            >
               {groups[section.key].map((text, index) => (
                 <div
                   key={index}
@@ -1048,7 +1052,7 @@ function KpiSlide({
               {kpi.label}
             </p>
             <p
-              className="font-bold leading-none"
+              className="min-w-0 font-bold leading-none"
               style={{ fontSize: compact ? "3.2cqw" : "4.5cqw" }}
             >
               {kpi.value}
@@ -1073,6 +1077,7 @@ function InfoCard({
 }) {
   return (
     <div
+      className="min-w-0 overflow-hidden"
       style={{
         background: dark
           ? "linear-gradient(180deg, rgba(255,255,255,0.11) 0%, rgba(255,255,255,0.05) 100%)"
