@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/table";
 import { ContentFilters } from "@/components/admin/content-filters";
 import { ContentRowActions } from "@/components/admin/content-row-actions";
-import { ImportPlanningDialog } from "@/components/admin/import-planning-dialog";
 import {
   CONTENT_STATUS_LABELS,
   CONTENT_TYPE_LABELS,
@@ -81,7 +80,6 @@ export default async function ContentPage({
           </p>
         </div>
         <div className="flex gap-2">
-          <ImportPlanningDialog />
           <Button asChild>
             <Link href="/content/new">
               <Plus className="h-4 w-4" /> Nieuw bericht
