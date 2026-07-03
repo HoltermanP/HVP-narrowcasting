@@ -1,5 +1,6 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { Organization, User } from "@prisma/client";
 
@@ -36,22 +37,38 @@ export async function requireUser(): Promise<AppUser> {
       where: { organizationId: organization.id },
     })) === 0;
 
-  return prisma.user.create({
-    data: {
-      clerkUserId: userId,
-      name:
-        clerkUser?.fullName ||
-        clerkUser?.firstName ||
-        clerkUser?.primaryEmailAddress?.emailAddress ||
-        "Gebruiker",
-      email:
-        clerkUser?.primaryEmailAddress?.emailAddress ??
-        `${userId}@onbekend.local`,
-      role: isFirstUser ? "admin" : "editor",
-      organizationId: organization.id,
-    },
-    include: { organization: true },
-  });
+  try {
+    return await prisma.user.create({
+      data: {
+        clerkUserId: userId,
+        name:
+          clerkUser?.fullName ||
+          clerkUser?.firstName ||
+          clerkUser?.primaryEmailAddress?.emailAddress ||
+          "Gebruiker",
+        email:
+          clerkUser?.primaryEmailAddress?.emailAddress ??
+          `${userId}@onbekend.local`,
+        role: isFirstUser ? "admin" : "editor",
+        organizationId: organization.id,
+      },
+      include: { organization: true },
+    });
+  } catch (error) {
+    // Race condition: een parallel request (layout + page tegelijk) heeft de
+    // gebruiker al aangemaakt. Haal het bestaande record op i.p.v. te crashen.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const user = await prisma.user.findUnique({
+        where: { clerkUserId: userId },
+        include: { organization: true },
+      });
+      if (user) return user;
+    }
+    throw error;
+  }
 }
 
 /** Alleen admins; anderen worden teruggestuurd naar het dashboard. */
