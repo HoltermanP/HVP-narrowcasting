@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { extractVgrFromPdf, type ExtractedVgr } from "@/lib/ai/extract-vgr";
 import {
+  deleteVgrSlidesExcept,
   upsertGanttSlides,
   upsertImportedItem,
   type UpsertResult,
@@ -88,11 +89,13 @@ export async function POST(request: Request) {
     ? `Stand per ${formatDutchDate(vgr.statusDate)}`
     : `Periode: ${vgr.period}`;
 
-  // 1. Planning (gantt) — automatisch gesplitst bij veel projecten
+  // 1. Planning (gantt) — automatisch gesplitst bij veel projecten.
+  // Vaste importKey ("vgr-planning") zodat een nieuwe upload de vorige altijd
+  // vervangt, ongeacht welke sleutel de AI zou verzinnen.
   const gantt = await upsertGanttSlides(
     user.organizationId,
     user.id,
-    vgr.importKey,
+    "vgr-planning",
     {
       title: vgr.title,
       subtitle,
@@ -124,7 +127,7 @@ export async function POST(request: Request) {
     highlights = await upsertImportedItem(
       user.organizationId,
       user.id,
-      `${vgr.importKey}-highlights`,
+      "vgr-highlights",
       "planning",
       {
         title: `Highlights — ${vgr.title}`,
@@ -133,7 +136,7 @@ export async function POST(request: Request) {
           period: vgr.period,
           planningView: "lijst",
           highlightGroups,
-          importKey: `${vgr.importKey}-highlights`,
+          importKey: "vgr-highlights",
         },
       }
     );
@@ -145,6 +148,7 @@ export async function POST(request: Request) {
     title: string;
     id: string;
     created: boolean;
+    importKey: string;
   }[] = [];
   for (const slide of vgr.topicSlides) {
     const importKey = `vgr-topic-${slide.topicId}`;
@@ -165,6 +169,15 @@ export async function POST(request: Request) {
     topicResults.push({ topicId: slide.topicId, title: slide.title, ...result });
   }
 
+  // Alles wat bij een vórige VGR-upload hoorde maar nu niet meer voorkomt
+  // (verdwenen onderwerpen, weggevallen highlights, oude planningdelen) wissen.
+  const keepKeys = [
+    ...gantt.map((r) => r.importKey),
+    ...(highlights ? [highlights.importKey] : []),
+    ...topicResults.map((r) => r.importKey),
+  ];
+  const removed = await deleteVgrSlidesExcept(user.organizationId, keepKeys);
+
   revalidatePath("/content");
   revalidatePath("/vgr");
   revalidatePath("/dashboard");
@@ -176,6 +189,7 @@ export async function POST(request: Request) {
     topics: topicResults,
     projectCount: vgr.projects.length,
     highlightCount,
+    removed,
   });
 }
 

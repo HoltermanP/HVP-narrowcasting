@@ -14,7 +14,40 @@ export const MAX_GANTT_ROWS = 8;
 /** Hoogste aantal delen waarvoor oude slides worden opgeruimd. */
 const MAX_GANTT_PARTS = 6;
 
-export type UpsertResult = { id: string; created: boolean };
+export type UpsertResult = { id: string; created: boolean; importKey: string };
+
+/**
+ * Verwijdert alle VGR-geïmporteerde slides (importKey begint met "vgr-") die
+ * NIET in de huidige upload voorkomen. Zo vervangt elke nieuwe VGR-upload de
+ * vorige volledig: verdwenen onderwerpen, lege highlights en oude planningdelen
+ * worden opgeruimd. Handmatig aangemaakte berichten (zonder vgr-importKey)
+ * blijven ongemoeid.
+ */
+export async function deleteVgrSlidesExcept(
+  organizationId: string,
+  keepKeys: string[]
+): Promise<number> {
+  const vgrItems = await prisma.contentItem.findMany({
+    where: {
+      organizationId,
+      metadata: { path: ["importKey"], string_starts_with: "vgr-" },
+    },
+    select: { id: true, metadata: true },
+  });
+
+  const keep = new Set(keepKeys);
+  const toDelete = vgrItems.filter((item) => {
+    const key = (item.metadata as { importKey?: string } | null)?.importKey;
+    return key ? !keep.has(key) : false;
+  });
+
+  if (toDelete.length > 0) {
+    await prisma.contentItem.deleteMany({
+      where: { id: { in: toDelete.map((item) => item.id) } },
+    });
+  }
+  return toDelete.length;
+}
 
 /** Verdeelt taken in gebalanceerde delen van maximaal MAX_GANTT_ROWS. */
 export function splitGanttTasks(tasks: GanttTask[]): GanttTask[][] {
@@ -57,7 +90,7 @@ export async function upsertImportedItem(
         metadata: data.metadata as Prisma.InputJsonValue,
       },
     });
-    return { id: existing.id, created: false };
+    return { id: existing.id, created: false, importKey };
   }
 
   const item = await prisma.contentItem.create({
@@ -92,7 +125,7 @@ export async function upsertImportedItem(
     });
   }
 
-  return { id: item.id, created: true };
+  return { id: item.id, created: true, importKey };
 }
 
 async function deleteImportedItem(

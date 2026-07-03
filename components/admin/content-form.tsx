@@ -50,6 +50,14 @@ function toDatetimeLocal(date: Date | null | undefined): string {
   return d.toISOString().slice(0, 16);
 }
 
+/** Splitst een tekstvak met één item per regel in een opgeschoonde lijst. */
+function toLines(text: string): string[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
 export function ContentForm({
   type,
   item,
@@ -105,6 +113,20 @@ export function ContentForm({
       ? metadata.kpis
       : [{ label: "", value: "", status: "groen" }]
   );
+  // Opsommingstekens voor nieuws-/onderwerpslides (VGR)
+  const [bulletsText, setBulletsText] = useState(
+    (metadata.bullets ?? []).join("\n")
+  );
+  // Highlight-groepen voor de highlights-slide (VGR)
+  const [achievedText, setAchievedText] = useState(
+    (metadata.highlightGroups?.achieved ?? []).join("\n")
+  );
+  const [upcomingText, setUpcomingText] = useState(
+    (metadata.highlightGroups?.upcoming ?? []).join("\n")
+  );
+  const [progressText, setProgressText] = useState(
+    (metadata.highlightGroups?.progress ?? []).join("\n")
+  );
 
   const supportsImage = type === "news" || type === "announcement";
   const supportsBody =
@@ -146,20 +168,25 @@ export function ContentForm({
           lesson: lesson || undefined,
           measure: measure || undefined,
         };
-      case "planning":
+      case "planning": {
+        const highlightGroups = {
+          achieved: toLines(achievedText),
+          upcoming: toLines(upcomingText),
+          progress: toLines(progressText),
+        };
+        const hasHighlights =
+          highlightGroups.achieved.length +
+            highlightGroups.upcoming.length +
+            highlightGroups.progress.length >
+          0;
         return {
           period: period || undefined,
           planningView,
-          // Behoud AI-importvelden bij handmatig bewerken
+          // Behoud AI-importveld bij handmatig bewerken
           importKey: metadata.importKey,
-          highlightGroups: metadata.highlightGroups,
+          highlightGroups: hasHighlights ? highlightGroups : undefined,
           activities:
-            planningView === "lijst"
-              ? activitiesText
-                  .split("\n")
-                  .map((line) => line.trim())
-                  .filter(Boolean)
-              : undefined,
+            planningView === "lijst" ? toLines(activitiesText) : undefined,
           tasks:
             planningView === "gantt"
               ? tasks.filter(
@@ -167,17 +194,24 @@ export function ContentForm({
                 )
               : undefined,
         };
+      }
       case "kpi":
         return {
           kpis: kpis.filter((row) => row.label.trim() && row.value.trim()),
           importKey: metadata.importKey,
         };
-      default:
-        // Behoud AI-importvelden (bullets, importKey) bij handmatig bewerken
-        if (metadata.bullets?.length || metadata.importKey) {
-          return { bullets: metadata.bullets, importKey: metadata.importKey };
+      default: {
+        // Nieuws-/onderwerpslides: bullets zijn nu bewerkbaar. importKey blijft
+        // behouden zodat een volgende VGR-upload de slide netjes vervangt.
+        const bullets = toLines(bulletsText);
+        if (bullets.length || metadata.importKey) {
+          return {
+            bullets: bullets.length ? bullets : undefined,
+            importKey: metadata.importKey,
+          };
         }
         return undefined;
+      }
     }
   }
 
@@ -273,6 +307,23 @@ export function ContentForm({
                 required={type === "incident"}
                 maxLength={5000}
               />
+            </div>
+          )}
+
+          {type === "news" && (
+            <div className="space-y-2">
+              <Label htmlFor="bullets">Opsommingstekens (één per regel)</Label>
+              <Textarea
+                id="bullets"
+                value={bulletsText}
+                onChange={(e) => setBulletsText(e.target.value)}
+                rows={5}
+                placeholder={"Eerste punt\nTweede punt\nDerde punt"}
+              />
+              <p className="text-xs text-slate-500">
+                Zijn er opsommingstekens ingevuld, dan toont de slide die in
+                plaats van de korte tekst hierboven.
+              </p>
             </div>
           )}
 
@@ -643,6 +694,50 @@ export function ContentForm({
                 </p>
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {type === "planning" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Highlights (optioneel)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-xs text-slate-500">
+              Vul je hier regels in, dan toont de slide deze highlights (behalve
+              wanneer de weergave op Gantt staat met taken). Eén per regel.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="achieved">Behaald</Label>
+              <Textarea
+                id="achieved"
+                value={achievedText}
+                onChange={(e) => setAchievedText(e.target.value)}
+                rows={3}
+                placeholder={"Mijlpaal X afgerond\nAudit geslaagd"}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="upcoming">Komende mijlpalen</Label>
+              <Textarea
+                id="upcoming"
+                value={upcomingText}
+                onChange={(e) => setUpcomingText(e.target.value)}
+                rows={3}
+                placeholder={"Oplevering fase 2\nStart proefdraaien"}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="progress">Voortgang</Label>
+              <Textarea
+                id="progress"
+                value={progressText}
+                onChange={(e) => setProgressText(e.target.value)}
+                rows={3}
+                placeholder={"Engineering op schema\nLevering onderdelen loopt"}
+              />
+            </div>
           </CardContent>
         </Card>
       )}
