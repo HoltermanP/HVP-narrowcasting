@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  editor
+  viewer
+}
+
+enum ContentType {
+  news
+  project_update
+  incident
+  planning
+  announcement
+  kpi
+}
+
+enum ContentStatus {
+  draft
+  scheduled
+  published
+  archived
+}
+
+enum Priority {
+  low
+  normal
+  high
+  urgent
+}
+
+model Organization {
+  id              String   @id @default(cuid())
+  name            String
+  logoUrl         String?
+  primaryColor    String   @default("#1e3a8a")
+  secondaryColor  String   @default("#3b82f6")
+  backgroundColor String   @default("#0f172a")
+  textColor       String   @default("#f8fafc")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  users        User[]
+  screens      Screen[]
+  playlists    Playlist[]
+  contentItems ContentItem[]
+  vgrTopics    VgrTopic[]
+}
+
+model User {
+  id             String   @id @default(cuid())
+  clerkUserId    String   @unique
+  name           String
+  email          String   @unique
+  role           Role     @default(editor)
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contentItems ContentItem[]
+}
+
+model Screen {
+  id             String    @id @default(cuid())
+  name           String
+  slug           String    @unique
+  location       String?
+  organizationId String
+  isActive       Boolean   @default(true)
+  lastSeenAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  playlists    Playlist[]
+  heartbeats   ScreenHeartbeat[]
+}
+
+model Playlist {
+  id             String   @id @default(cuid())
+  name           String
+  organizationId String
+  screenId       String?
+  isDefault      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  screen       Screen?        @relation(fields: [screenId], references: [id], onDelete: SetNull)
+  items        PlaylistItem[]
+}
+
+model ContentItem {
+  id              String        @id @default(cuid())
+  organizationId  String
+  title           String
+  subtitle        String?
+  body            String?
+  type            ContentType
+  status          ContentStatus @default(draft)
+  priority        Priority      @default(normal)
+  imageUrl        String?
+  videoUrl        String?
+  startDate       DateTime?
+  endDate         DateTime?
+  durationSeconds Int           @default(15)
+  isActive        Boolean       @default(true)
+  /// Type-specifieke velden (projectstatus, KPI-regels, activiteiten, etc.)
+  metadata        Json?
+  createdBy       String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator       User?          @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  playlistItems PlaylistItem[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, type])
+}
+
+model PlaylistItem {
+  id              String   @id @default(cuid())
+  playlistId      String
+  contentItemId   String
+  sortOrder       Int      @default(0)
+  durationSeconds Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  playlist    Playlist    @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+
+  @@index([playlistId, sortOrder])
+}
+
+/// Onderwerp voor de maandelijkse VGR-import: per onderwerp maakt de AI een slide.
+model VgrTopic {
+  id             String   @id @default(cuid())
+  organizationId String
+  title          String
+  /// Instructie voor de AI: wat moet er op deze slide komen?
+  instructions   String?
+  sortOrder      Int      @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, sortOrder])
+}
+
+model ScreenHeartbeat {
+  id        String   @id @default(cuid())
+  screenId  String
+  timestamp DateTime @default(now())
+  userAgent String?
+  ipAddress String?
+
+  screen Screen @relation(fields: [screenId], references: [id], onDelete: Cascade)
+
+  @@index([screenId, timestamp])
+}
